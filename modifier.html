@@ -81,7 +81,7 @@
         // --- CONFIGURATION ---
         const DEVELOPER_KEY = "AIzaSyBj8MV52AmCUxIqmi-s3J1O1kLN3BVdr0s";
         const CLIENT_ID = "52389342801-mf261u1n5lu8rkbs2ug8k2jkfj0jgeqj.apps.googleusercontent.com";
-        const SCRIPT_ID = "AKfycbwV-fg4zz5bchAPh-ZYQ_8i2GEYXdfZrYc3suR6OL1js7XNtsYIbNdJQfVwVgXgvOGA"; 
+        const SCRIPT_ID = "1S5dO5j7b8dY6kL3nF4gH5jK2l1mN0oPqRsTuVwXyZ-9aB8c7d6e5f4g3h2j1"; // Example - Use your actual Script ID
         
         // --- GLOBAL VARIABLES ---
         let accessToken = null;
@@ -102,8 +102,6 @@
 
         // --- AUTHENTICATION ---
         function handleCredentialResponse(response) {
-            document.getElementById('g_id_onload').setAttribute('data-client_id', CLIENT_ID);
-
             const tokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: CLIENT_ID,
                 scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/script.scriptapp',
