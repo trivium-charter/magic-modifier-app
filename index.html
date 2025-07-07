@@ -12,7 +12,6 @@
         body {
             font-family: 'Inter', sans-serif;
         }
-        /* Simple spinner for loading states */
         .spinner {
             border: 4px solid rgba(0, 0, 0, 0.1);
             width: 24px;
@@ -31,13 +30,11 @@
 
     <div class="w-full max-w-2xl mx-auto bg-white rounded-xl shadow-lg p-8 space-y-6">
         
-        <!-- Header -->
         <div class="text-center">
             <h1 class="text-3xl font-bold text-gray-800">Curriculum Modification Tool</h1>
             <p class="text-gray-500 mt-2">Modify Google Slides presentations with AI.</p>
         </div>
 
-        <!-- Authentication Section -->
         <div id="auth-section" class="text-center">
             <p class="text-gray-600 mb-4">Please sign in to access your Google Drive.</p>
             <div id="g_id_onload"
@@ -55,7 +52,6 @@
             </div>
         </div>
 
-        <!-- Main App Section (Hidden by default) -->
         <div id="app-section" class="hidden space-y-6">
             <div class="flex items-center justify-between">
                 <div>
@@ -67,7 +63,6 @@
                 </button>
             </div>
 
-            <!-- Step 1: Select File -->
             <div>
                 <label class="text-lg font-semibold text-gray-700">Step 1: Choose a Presentation</label>
                 <div class="mt-2 flex items-center space-x-4 p-4 border-2 border-dashed rounded-lg">
@@ -82,14 +77,12 @@
                 </div>
             </div>
 
-            <!-- Step 2: Set Options -->
             <div>
                 <label for="lexile-level" class="text-lg font-semibold text-gray-700">Step 2: Set Reading Level</label>
                 <input type="text" id="lexile-level" value="5th grade" class="mt-2 block w-full px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
                 <p class="text-xs text-gray-500 mt-1">e.g., "5th grade", "Lexile 800L", "beginner English learner"</p>
             </div>
             
-            <!-- Step 3: Run -->
             <div class="text-center">
                 <button id="start-btn" onclick="startModificationProcess()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg transition-colors text-lg flex items-center justify-center disabled:bg-gray-400" disabled>
                     <span id="start-btn-text">Start Modification</span>
@@ -97,7 +90,6 @@
                 </button>
             </div>
 
-            <!-- Status Log -->
             <div>
                 <label class="text-lg font-semibold text-gray-700">Progress Log</label>
                 <div id="status-log" class="mt-2 w-full h-48 bg-gray-900 text-white font-mono text-sm p-4 rounded-lg overflow-y-auto">
@@ -110,54 +102,49 @@
     <script>
         // --- CONFIGURATION ---
         const SCRIPT_URL = "https://script.google.com/a/macros/triviumcharter.org/s/AKfycbxdinOfLTwl8POeOfEkNLF_SknW5ekvWR4xOsMN-yJRwMTjJFXcrXN8OYcQULV-VDPV/exec";
-        const DEVELOPER_KEY = "AIzaSyDLFs2TVVdxeHF4hcnHorwgHrz6e77mt_8"; // The same API key used in the script
+        const DEVELOPER_KEY = "AIzaSyDLFs2TVVdxeHF4hcnHorwgHrz6e77mt_8";
         const CLIENT_ID = "52389342801-mf261u1n5lu8rkbs2ug8k2jkfj0jgeqj.apps.googleusercontent.com";
         
         // --- GLOBAL VARIABLES ---
         let tokenClient;
         let accessToken = null;
-        let pickerApiLoaded = false;
+        let gapiInited = false;
+        let gisInited = false;
         let selectedFileId = null;
 
-        // --- INITIALIZATION ---
+        // --- ROBUST INITIALIZATION ---
+        // These functions are called by the Google scripts once they are loaded.
         function gapiLoaded() {
-            console.log("gapiLoaded: GAPI script has loaded.");
-            gapi.load('client:picker', initializePicker);
+            gapi.load('client:picker', () => {
+                gapiInited = true;
+            });
         }
-
         function gisLoaded() {
-            console.log("gisLoaded: GIS script has loaded.");
             tokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: CLIENT_ID,
                 scope: 'https://www.googleapis.com/auth/drive.readonly',
                 callback: (tokenResponse) => {
-                    console.log("Token Callback Fired:", tokenResponse);
                     if (tokenResponse && tokenResponse.access_token) {
-                        console.log("Access Token received successfully.");
                         accessToken = tokenResponse.access_token;
                         showApp();
-                    } else {
-                        console.error("Token Callback Error: No access token received.", tokenResponse);
                     }
                 },
             });
-            console.log("gisLoaded: Token client has been initialized.");
-        }
-
-        function initializePicker() {
-            console.log("initializePicker: Picker API has been initialized.");
-            pickerApiLoaded = true;
+            gisInited = true;
         }
 
         // --- AUTHENTICATION ---
         function handleCredentialResponse(response) {
-            console.log("handleCredentialResponse: User has signed in. Response:", response);
-            console.log("Requesting access token for Drive scope...");
+            // Check if the token client is ready before using it.
+            if (!gisInited) {
+                console.error("GIS not initialized yet. Trying again in a moment.");
+                setTimeout(() => handleCredentialResponse(response), 500);
+                return;
+            }
             tokenClient.requestAccessToken();
         }
 
         function showApp() {
-            console.log("showApp: Showing the main application view.");
             document.getElementById('auth-section').classList.add('hidden');
             document.getElementById('app-section').classList.remove('hidden');
             document.getElementById('user-email').textContent = 'Signed in successfully.';
@@ -169,17 +156,14 @@
             document.getElementById('auth-section').classList.remove('hidden');
             document.getElementById('app-section').classList.add('hidden');
             logStatus('User signed out.');
-            console.log("User has signed out.");
         }
 
         // --- GOOGLE PICKER ---
         function showPicker() {
-            if (!pickerApiLoaded || !accessToken) {
+            if (!gapiInited || !accessToken) {
                 logStatus("Error: Picker not loaded or user not signed in.");
-                console.error("showPicker Error: Picker not loaded or no access token.");
                 return;
             }
-
             const view = new google.picker.View(google.picker.ViewId.PRESENTATIONS);
             const picker = new google.picker.PickerBuilder()
                 .enableFeature(google.picker.Feature.NAV_HIDDEN)
@@ -209,26 +193,18 @@
                 logStatus("Error: No file selected.");
                 return;
             }
-            if (SCRIPT_URL === "https://trivium-charter.github.io/magic-modifier-app/") {
-                logStatus("ERROR: Please configure the SCRIPT_URL in the HTML file.");
-                alert("Configuration Error: The Apps Script URL is not set. Please edit the HTML file.");
-                return;
-            }
-
-            const targetLexile = document.getElementById('lexile-level').value;
             setLoadingState(true);
             logStatus("Starting modification process...");
+            const targetLexile = document.getElementById('lexile-level').value;
             logStatus(`Target reading level: ${targetLexile}`);
 
             const payload = {
                 presentationId: selectedFileId,
                 targetLexile: targetLexile
             };
-
             const headers = new Headers({
                 "Content-Type": "application/json",
-                // CORRECTED: Use the accessToken variable directly
-                "Authorization": `Bearer ${accessToken}` 
+                "Authorization": `Bearer ${accessToken}`
             });
 
             fetch(SCRIPT_URL, {
@@ -268,14 +244,13 @@
         function logStatus(message) {
             const log = document.getElementById('status-log');
             log.innerHTML += `<p>${new Date().toLocaleTimeString()}: ${message}</p>`;
-            log.scrollTop = log.scrollHeight; // Auto-scroll to bottom
+            log.scrollTop = log.scrollHeight;
         }
 
         function setLoadingState(isLoading) {
             const btn = document.getElementById('start-btn');
             const btnText = document.getElementById('start-btn-text');
             const spinner = document.getElementById('start-btn-spinner');
-
             if (isLoading) {
                 btn.disabled = true;
                 btnText.textContent = "Processing...";
@@ -286,7 +261,6 @@
                 spinner.classList.add('hidden');
             }
         }
-
     </script>
 </body>
 </html>
