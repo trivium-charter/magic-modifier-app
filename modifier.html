@@ -23,7 +23,8 @@
 
         <div id="auth-section" class="text-center">
             <p class="text-gray-600 mb-4">Please sign in to access your Google Drive.</p>
-            <button id="auth-btn" onclick="handleAuthClick()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">
+            <!-- MODIFICATION: Button starts disabled -->
+            <button id="auth-btn" onclick="handleAuthClick()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
                 Sign in with Google
             </button>
         </div>
@@ -94,6 +95,10 @@
                 discoveryDocs: ["https://script.googleapis.com/$discovery/rest?version=v1"]
             }).then(function () {
                 googleAuth = gapi.auth2.getAuthInstance();
+                
+                // MODIFICATION: Enable the sign-in button now that auth is ready
+                document.getElementById('auth-btn').disabled = false;
+
                 googleAuth.isSignedIn.listen(updateSigninStatus);
                 updateSigninStatus(googleAuth.isSignedIn.get());
             }, function(error) {
