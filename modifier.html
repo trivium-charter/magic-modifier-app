@@ -23,7 +23,6 @@
 
         <div id="auth-section" class="text-center">
             <p class="text-gray-600 mb-4">Please sign in to access your Google Drive.</p>
-            <!-- MODIFICATION: Button starts disabled -->
             <button id="auth-btn" onclick="handleAuthClick()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
                 Sign in with Google
             </button>
@@ -59,7 +58,7 @@
             <div class="text-center">
                 <button id="start-btn" onclick="startModificationProcess()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg transition-colors text-lg flex items-center justify-center disabled:bg-gray-400" disabled>
                     <span id="start-btn-text">Start Modification</span>
-                    <div id="start-btn-spinner" class="spinner hidden ml-3"></div>
+                    <div id="start-btn-spinner" class="spinner" style="display: none;"></div>
                 </button>
             </div>
 
@@ -83,31 +82,38 @@
         let googleAuth;
         let selectedFileId = null;
 
+        // --- ROBUST INITIALIZATION ---
         function onGapiLoaded() {
-            gapi.load('client:auth2:picker', initClient);
-        }
+            logStatus("Google API script loaded.");
+            gapi.load('client:auth2:picker', function() {
+                logStatus("Auth2 and Picker libraries loaded.");
+                gapi.client.init({
+                    apiKey: DEVELOPER_KEY,
+                    clientId: CLIENT_ID,
+                    scope: SCOPES,
+                    discoveryDocs: ["https://script.googleapis.com/$discovery/rest?version=v1"]
+                }).then(function () {
+                    logStatus("Google API client initialized successfully.");
+                    googleAuth = gapi.auth2.getAuthInstance();
+                    
+                    document.getElementById('auth-btn').disabled = false;
+                    logStatus("Sign-in button enabled.");
 
-        function initClient() {
-            gapi.client.init({
-                apiKey: DEVELOPER_KEY,
-                clientId: CLIENT_ID,
-                scope: SCOPES,
-                discoveryDocs: ["https://script.googleapis.com/$discovery/rest?version=v1"]
-            }).then(function () {
-                googleAuth = gapi.auth2.getAuthInstance();
-                
-                // MODIFICATION: Enable the sign-in button now that auth is ready
-                document.getElementById('auth-btn').disabled = false;
-
-                googleAuth.isSignedIn.listen(updateSigninStatus);
-                updateSigninStatus(googleAuth.isSignedIn.get());
-            }, function(error) {
-                logStatus('Error initializing Google API client: ' + JSON.stringify(error, null, 2));
+                    googleAuth.isSignedIn.listen(updateSigninStatus);
+                    updateSigninStatus(googleAuth.isSignedIn.get());
+                }, function(error) {
+                    logStatus('Error initializing Google API client: ' + JSON.stringify(error, null, 2));
+                    console.error('Initialization Error:', error);
+                });
             });
         }
 
         function handleAuthClick() {
-            googleAuth.signIn();
+            if (googleAuth) {
+                googleAuth.signIn();
+            } else {
+                logStatus("Authentication service not ready.");
+            }
         }
 
         function handleSignoutClick() {
