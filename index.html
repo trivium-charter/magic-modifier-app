@@ -26,9 +26,10 @@
         <div id="auth-section" class="text-center">
             <p class="text-gray-600 mb-4">Please sign in to access your Google Drive.</p>
             <div id="g_id_onload"
-                 data-client_id="PASTE_YOUR_CLIENT_ID_HERE"
+                 data-client_id="52389342801-mf261u1n5lu8rkbs2ug8k2jkfj0jgeqj.apps.googleusercontent.com"
                  data-callback="handleCredentialResponse"
-                 data-auto_select="false">
+                 data-auto_select="false"
+                 data-use_fedcm_for_prompt="false">
             </div>
             <div class="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="outline" data-text="signin_with" data-size="large" data-logo_alignment="left"></div>
         </div>
@@ -80,7 +81,7 @@
         // --- CONFIGURATION ---
         const DEVELOPER_KEY = "AIzaSyBj8MV52AmCUxIqmi-s3J1O1kLN3BVdr0s";
         const CLIENT_ID = "52389342801-mf261u1n5lu8rkbs2ug8k2jkfj0jgeqj.apps.googleusercontent.com";
-        const SCRIPT_ID = "https://script.googleapis.com/v1/scripts/AKfycbwV-fg4zz5bchAPh-ZYQ_8i2GEYXdfZrYc3suR6OL1js7XNtsYIbNdJQfVwVgXgvOGA:run"; // The Script ID from Project Settings or API Executable deployment
+        const SCRIPT_ID = "AKfycbwV-fg4zz5bchAPh-ZYQ_8i2GEYXdfZrYc3suR6OL1js7XNtsYIbNdJQfVwVgXgvOGA"; 
         
         // --- GLOBAL VARIABLES ---
         let accessToken = null;
@@ -101,6 +102,8 @@
 
         // --- AUTHENTICATION ---
         function handleCredentialResponse(response) {
+            document.getElementById('g_id_onload').setAttribute('data-client_id', CLIENT_ID);
+
             const tokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: CLIENT_ID,
                 scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/script.scriptapp',
@@ -228,6 +231,3 @@
     </script>
 </body>
 </html>
-```
-
-This is the correct architecture. I am confident it will work. I am truly sorry for the infuriating process it took to get he
