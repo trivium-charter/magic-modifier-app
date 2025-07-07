@@ -6,7 +6,6 @@
     <title>Curriculum Modification Tool</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <!-- MODIFICATION 1: Made the onload callback explicit for reliability -->
     <script src="https://apis.google.com/js/api.js?onload=gapiLoaded" async defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -72,7 +71,8 @@
                         <p id="file-name" class="text-gray-700 font-medium">No file selected.</p>
                         <p id="file-id-display" class="text-xs text-gray-500"></p>
                     </div>
-                    <button id="pick-file-btn" onclick="showPicker()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                    <!-- The "Select File" button now starts as disabled -->
+                    <button id="pick-file-btn" onclick="showPicker()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
                         Select File
                     </button>
                 </div>
@@ -102,7 +102,7 @@
 
     <script>
         // --- CONFIGURATION ---
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyuWOTNvNcJLY5rDg2TZ9PUeC6LEQG8bABpvFWjwwyijMVQOtSiJYvthh8A22brg1kw/exec";
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyuWOTNvNcJLY5rDg2TZ9PUeC6LEQG8bABpvFWjwwyijMVQOtSiJYvthh8A22brg1kw/exec"; // Make sure this is your latest URL
         const DEVELOPER_KEY = "AIzaSyBj8MV52AmCUxIqmi-s3J1O1kLN3BVdr0s";
         const CLIENT_ID = "52389342801-mf261u1n5lu8rkbs2ug8k2jkfj0jgeqj.apps.googleusercontent.com";
         
@@ -116,6 +116,10 @@
         function gapiLoaded() {
             gapi.load('client:picker', () => {
                 gapiInited = true;
+                // Once the picker is ready, enable the button if the user is signed in.
+                if (accessToken) {
+                    document.getElementById('pick-file-btn').disabled = false;
+                }
             });
         }
 
@@ -140,6 +144,10 @@
             document.getElementById('auth-section').classList.add('hidden');
             document.getElementById('app-section').classList.remove('hidden');
             document.getElementById('user-email').textContent = 'Signed in successfully.';
+            // The user is signed in, enable the button if the picker is also ready.
+            if (gapiInited) {
+                document.getElementById('pick-file-btn').disabled = false;
+            }
         }
 
         function signOut() {
@@ -148,11 +156,15 @@
             tokenClient = null; 
             document.getElementById('auth-section').classList.remove('hidden');
             document.getElementById('app-section').classList.add('hidden');
+            // Disable buttons on sign out
+            document.getElementById('pick-file-btn').disabled = true;
+            document.getElementById('start-btn').disabled = true;
             logStatus('User signed out.');
         }
 
         // --- GOOGLE PICKER ---
         function showPicker() {
+            // This check is now a fallback, the disabled button is the primary guard.
             if (!gapiInited || !accessToken) {
                 logStatus("Error: Picker API not ready or user not fully signed in.");
                 return;
@@ -169,7 +181,6 @@
             picker.setVisible(true);
         }
 
-        // MODIFICATION 2: Corrected how the picker data is read.
         function pickerCallback(data) {
             if (data[google.picker.Response.ACTION] == google.picker.Action.PICKED) {
                 const doc = data[google.picker.Response.DOCUMENTS][0];
@@ -198,7 +209,7 @@
             };
             const headers = new Headers({
                 "Content-Type": "application/json",
-//                "Authorization": `Bearer ${accessToken}`
+                "Authorization": `Bearer ${accessToken}`
             });
 
             fetch(SCRIPT_URL, {
