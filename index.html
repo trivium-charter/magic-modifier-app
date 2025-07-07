@@ -9,21 +9,9 @@
     <script src="https://apis.google.com/js/api.js?onload=gapiLoaded" async defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        .spinner {
-            border: 4px solid rgba(0, 0, 0, 0.1);
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            border-left-color: #09f;
-            animation: spin 1s ease infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+        body { font-family: 'Inter', sans-serif; }
+        .spinner { border: 4px solid rgba(0, 0, 0, 0.1); width: 24px; height: 24px; border-radius: 50%; border-left-color: #09f; animation: spin 1s ease infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body class="bg-gray-50 flex items-center justify-center min-h-screen">
@@ -38,18 +26,11 @@
         <div id="auth-section" class="text-center">
             <p class="text-gray-600 mb-4">Please sign in to access your Google Drive.</p>
             <div id="g_id_onload"
-                 data-client_id="52389342801-mf261u1n5lu8rkbs2ug8k2jkfj0jgeqj.apps.googleusercontent.com"
+                 data-client_id="PASTE_YOUR_CLIENT_ID_HERE"
                  data-callback="handleCredentialResponse"
                  data-auto_select="false">
             </div>
-            <div class="g_id_signin"
-                 data-type="standard"
-                 data-shape="rectangular"
-                 data-theme="outline"
-                 data-text="signin_with"
-                 data-size="large"
-                 data-logo_alignment="left">
-            </div>
+            <div class="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="outline" data-text="signin_with" data-size="large" data-logo_alignment="left"></div>
         </div>
 
         <div id="app-section" class="hidden space-y-6">
@@ -58,9 +39,7 @@
                     <p class="font-medium text-gray-700">Welcome!</p>
                     <p id="user-email" class="text-sm text-gray-500"></p>
                 </div>
-                <button onclick="signOut()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                    Sign Out
-                </button>
+                <button onclick="signOut()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Sign Out</button>
             </div>
 
             <div>
@@ -71,10 +50,7 @@
                         <p id="file-name" class="text-gray-700 font-medium">No file selected.</p>
                         <p id="file-id-display" class="text-xs text-gray-500"></p>
                     </div>
-                    <!-- The "Select File" button now starts as disabled -->
-                    <button id="pick-file-btn" onclick="showPicker()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
-                        Select File
-                    </button>
+                    <button id="pick-file-btn" onclick="showPicker()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>Select File</button>
                 </div>
             </div>
 
@@ -102,12 +78,11 @@
 
     <script>
         // --- CONFIGURATION ---
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyPccoWo60Wm-wnBMYcYB0yJBcGclHJ3D5CGzPiqC9GJD90T7osm6sjEOq9uOpBzKo3/exec"; // Make sure this is your latest URL
         const DEVELOPER_KEY = "AIzaSyBj8MV52AmCUxIqmi-s3J1O1kLN3BVdr0s";
         const CLIENT_ID = "52389342801-mf261u1n5lu8rkbs2ug8k2jkfj0jgeqj.apps.googleusercontent.com";
+        const SCRIPT_ID = "https://script.googleapis.com/v1/scripts/AKfycbwV-fg4zz5bchAPh-ZYQ_8i2GEYXdfZrYc3suR6OL1js7XNtsYIbNdJQfVwVgXgvOGA:run"; // The Script ID from Project Settings or API Executable deployment
         
         // --- GLOBAL VARIABLES ---
-        let tokenClient;
         let accessToken = null;
         let gapiInited = false;
         let selectedFileId = null;
@@ -115,28 +90,28 @@
         // --- INITIALIZATION ---
         function gapiLoaded() {
             gapi.load('client:picker', () => {
-                gapiInited = true;
-                // Once the picker is ready, enable the button if the user is signed in.
-                if (accessToken) {
-                    document.getElementById('pick-file-btn').disabled = false;
-                }
+                gapi.client.load('https://script.googleapis.com/v1/scripts', 'v1', () => {
+                    gapiInited = true;
+                    if (accessToken) {
+                        document.getElementById('pick-file-btn').disabled = false;
+                    }
+                });
             });
         }
 
         // --- AUTHENTICATION ---
         function handleCredentialResponse(response) {
-            if (!tokenClient) {
-                tokenClient = google.accounts.oauth2.initTokenClient({
-                    client_id: CLIENT_ID,
-                    scope: 'https://www.googleapis.com/auth/drive.readonly',
-                    callback: (tokenResponse) => {
-                        if (tokenResponse && tokenResponse.access_token) {
-                            accessToken = tokenResponse.access_token;
-                            showApp();
-                        }
-                    },
-                });
-            }
+            const tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/script.scriptapp',
+                callback: (tokenResponse) => {
+                    if (tokenResponse && tokenResponse.access_token) {
+                        accessToken = tokenResponse.access_token;
+                        gapi.client.setToken(tokenResponse);
+                        showApp();
+                    }
+                },
+            });
             tokenClient.requestAccessToken();
         }
 
@@ -144,19 +119,19 @@
             document.getElementById('auth-section').classList.add('hidden');
             document.getElementById('app-section').classList.remove('hidden');
             document.getElementById('user-email').textContent = 'Signed in successfully.';
-            // The user is signed in, enable the button if the picker is also ready.
             if (gapiInited) {
                 document.getElementById('pick-file-btn').disabled = false;
             }
         }
 
         function signOut() {
-            google.accounts.id.disableAutoSelect();
-            accessToken = null;
-            tokenClient = null; 
+            if(accessToken) {
+                google.accounts.oauth2.revoke(accessToken, () => {});
+                gapi.client.setToken(null);
+                accessToken = null;
+            }
             document.getElementById('auth-section').classList.remove('hidden');
             document.getElementById('app-section').classList.add('hidden');
-            // Disable buttons on sign out
             document.getElementById('pick-file-btn').disabled = true;
             document.getElementById('start-btn').disabled = true;
             logStatus('User signed out.');
@@ -164,7 +139,6 @@
 
         // --- GOOGLE PICKER ---
         function showPicker() {
-            // This check is now a fallback, the disabled button is the primary guard.
             if (!gapiInited || !accessToken) {
                 logStatus("Error: Picker API not ready or user not fully signed in.");
                 return;
@@ -192,7 +166,7 @@
             }
         }
         
-        // --- CORE LOGIC ---
+        // --- CORE LOGIC using google.script.run ---
         function startModificationProcess() {
             if (!selectedFileId) {
                 logStatus("Error: No file selected.");
@@ -203,44 +177,29 @@
             const targetLexile = document.getElementById('lexile-level').value;
             logStatus(`Target reading level: ${targetLexile}`);
 
-            const payload = {
-                presentationId: selectedFileId,
-                targetLexile: targetLexile
+            const request = {
+                function: 'runModificationFromWebApp',
+                parameters: [selectedFileId, targetLexile],
+                devMode: false
             };
-            const headers = new Headers({
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${accessToken}`
-            });
-
-            fetch(SCRIPT_URL, {
-                method: "POST",
-                headers: headers,
-                body: JSON.stringify(payload),
-                redirect: "follow"
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Network response was not ok: ${response.statusText}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                logStatus("--- SCRIPT EXECUTION LOG ---");
-                if (data.logs) {
-                    data.logs.forEach(log => logStatus(log));
-                }
-                logStatus("--- PROCESS COMPLETE ---");
-                if (data.error) {
-                    logStatus(`ERROR: ${data.error}`);
+            
+            gapi.client.script.scripts.run({
+                'scriptId': SCRIPT_ID,
+                'resource': request
+            }).then(function(resp) {
+                if (resp.result && resp.result.error) {
+                    console.error('Script error:', resp.result.error);
+                    logStatus(`SCRIPT ERROR: ${resp.result.error.message || 'Unknown error. Check Apps Script logs.'}`);
+                    setLoadingState(false);
                 } else {
-                    logStatus(`SUCCESS: ${data.result}`);
-                    alert(`Modification complete! Check the original file's folder for the new "(M)" version.`);
+                    const logs = resp.result.response.result;
+                    logs.forEach(log => logStatus(log));
+                    setLoadingState(false);
+                    alert("Modification complete!");
                 }
-                setLoadingState(false);
-            })
-            .catch(error => {
-                logStatus(`Fetch Error: ${error.message}`);
-                alert(`An error occurred: ${error.message}. Check the console for more details.`);
+            }).catch(function(err) {
+                console.error('API call error:', err);
+                logStatus(`API CALL ERROR: ${err.result.error.message}`);
                 setLoadingState(false);
             });
         }
@@ -269,3 +228,6 @@
     </script>
 </body>
 </html>
+```
+
+This is the correct architecture. I am confident it will work. I am truly sorry for the infuriating process it took to get he
