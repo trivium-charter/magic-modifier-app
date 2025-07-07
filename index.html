@@ -109,38 +109,36 @@
         let tokenClient;
         let accessToken = null;
         let gapiInited = false;
-        let gisInited = false;
         let selectedFileId = null;
 
-        // --- ROBUST INITIALIZATION ---
-        // These functions are called by the Google scripts once they are loaded.
+        // --- INITIALIZATION ---
+        // This function is called by the Google 'api.js' script once it's loaded.
         function gapiLoaded() {
             gapi.load('client:picker', () => {
+                // This callback is called after the picker API is loaded.
                 gapiInited = true;
             });
         }
-        function gisLoaded() {
-            tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: CLIENT_ID,
-                scope: 'https://www.googleapis.com/auth/drive.readonly',
-                callback: (tokenResponse) => {
-                    if (tokenResponse && tokenResponse.access_token) {
-                        accessToken = tokenResponse.access_token;
-                        showApp();
-                    }
-                },
-            });
-            gisInited = true;
-        }
 
         // --- AUTHENTICATION ---
+        // This function is called by the Google Sign-In button's callback.
         function handleCredentialResponse(response) {
-            // Check if the token client is ready before using it.
-            if (!gisInited) {
-                console.error("GIS not initialized yet. Trying again in a moment.");
-                setTimeout(() => handleCredentialResponse(response), 500);
-                return;
+            // Initialize the token client on the first run.
+            // This avoids race conditions.
+            if (!tokenClient) {
+                tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: CLIENT_ID,
+                    scope: 'https://www.googleapis.com/auth/drive.readonly',
+                    callback: (tokenResponse) => {
+                        // This callback is called after the user grants permission.
+                        if (tokenResponse && tokenResponse.access_token) {
+                            accessToken = tokenResponse.access_token;
+                            showApp();
+                        }
+                    },
+                });
             }
+            // Now that the client is initialized, ask for the user's permission.
             tokenClient.requestAccessToken();
         }
 
@@ -153,6 +151,7 @@
         function signOut() {
             google.accounts.id.disableAutoSelect();
             accessToken = null;
+            tokenClient = null; // Reset the client on sign-out
             document.getElementById('auth-section').classList.remove('hidden');
             document.getElementById('app-section').classList.add('hidden');
             logStatus('User signed out.');
@@ -161,7 +160,7 @@
         // --- GOOGLE PICKER ---
         function showPicker() {
             if (!gapiInited || !accessToken) {
-                logStatus("Error: Picker not loaded or user not signed in.");
+                logStatus("Error: Picker API not ready or user not fully signed in.");
                 return;
             }
             const view = new google.picker.View(google.picker.ViewId.PRESENTATIONS);
@@ -177,13 +176,13 @@
         }
 
         function pickerCallback(data) {
-            if (data[google.picker.Response.ACTION] == google.picker.Action.PICKED) {
-                const doc = data[google.picker.Response.DOCUMENTS][0];
-                selectedFileId = doc[google.picker.Document.ID];
-                document.getElementById('file-name').textContent = doc[google.picker.Document.NAME];
+            if (data.response == google.picker.Action.PICKED) {
+                const doc = data.docs[0];
+                selectedFileId = doc.id;
+                document.getElementById('file-name').textContent = doc.name;
                 document.getElementById('file-id-display').textContent = `ID: ${selectedFileId}`;
                 document.getElementById('start-btn').disabled = false;
-                logStatus(`Selected file: ${doc[google.picker.Document.NAME]}`);
+                logStatus(`Selected file: ${doc.name}`);
             }
         }
         
