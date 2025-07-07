@@ -90,7 +90,7 @@
 
         function initAuth() {
             logStatus("Auth2 library loaded.");
-            gapi.client.init({
+            gapi.auth2.init({
                 apiKey: DEVELOPER_KEY,
                 clientId: CLIENT_ID,
                 scope: SCOPES
@@ -122,7 +122,6 @@
             if (isSignedIn) {
                 document.getElementById('auth-section').style.display = 'none';
                 document.getElementById('app-section').style.display = 'block';
-                // Load Picker and Script APIs only after successful sign-in
                 loadPickerAndScriptApi();
             } else {
                 document.getElementById('auth-section').style.display = 'block';
