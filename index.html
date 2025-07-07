@@ -6,7 +6,8 @@
     <title>Curriculum Modification Tool</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="https://apis.google.com/js/api.js" async defer></script>
+    <!-- MODIFICATION 1: Made the onload callback explicit for reliability -->
+    <script src="https://apis.google.com/js/api.js?onload=gapiLoaded" async defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -112,25 +113,19 @@
         let selectedFileId = null;
 
         // --- INITIALIZATION ---
-        // This function is called by the Google 'api.js' script once it's loaded.
         function gapiLoaded() {
             gapi.load('client:picker', () => {
-                // This callback is called after the picker API is loaded.
                 gapiInited = true;
             });
         }
 
         // --- AUTHENTICATION ---
-        // This function is called by the Google Sign-In button's callback.
         function handleCredentialResponse(response) {
-            // Initialize the token client on the first run.
-            // This avoids race conditions.
             if (!tokenClient) {
                 tokenClient = google.accounts.oauth2.initTokenClient({
                     client_id: CLIENT_ID,
                     scope: 'https://www.googleapis.com/auth/drive.readonly',
                     callback: (tokenResponse) => {
-                        // This callback is called after the user grants permission.
                         if (tokenResponse && tokenResponse.access_token) {
                             accessToken = tokenResponse.access_token;
                             showApp();
@@ -138,7 +133,6 @@
                     },
                 });
             }
-            // Now that the client is initialized, ask for the user's permission.
             tokenClient.requestAccessToken();
         }
 
@@ -151,7 +145,7 @@
         function signOut() {
             google.accounts.id.disableAutoSelect();
             accessToken = null;
-            tokenClient = null; // Reset the client on sign-out
+            tokenClient = null; 
             document.getElementById('auth-section').classList.remove('hidden');
             document.getElementById('app-section').classList.add('hidden');
             logStatus('User signed out.');
@@ -175,14 +169,15 @@
             picker.setVisible(true);
         }
 
+        // MODIFICATION 2: Corrected how the picker data is read.
         function pickerCallback(data) {
-            if (data.response == google.picker.Action.PICKED) {
-                const doc = data.docs[0];
-                selectedFileId = doc.id;
-                document.getElementById('file-name').textContent = doc.name;
+            if (data[google.picker.Response.ACTION] == google.picker.Action.PICKED) {
+                const doc = data[google.picker.Response.DOCUMENTS][0];
+                selectedFileId = doc[google.picker.Document.ID];
+                document.getElementById('file-name').textContent = doc[google.picker.Document.NAME];
                 document.getElementById('file-id-display').textContent = `ID: ${selectedFileId}`;
                 document.getElementById('start-btn').disabled = false;
-                logStatus(`Selected file: ${doc.name}`);
+                logStatus(`Selected file: ${doc[google.picker.Document.NAME]}`);
             }
         }
         
