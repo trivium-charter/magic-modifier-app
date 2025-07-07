@@ -82,29 +82,27 @@
         let googleAuth;
         let selectedFileId = null;
 
-        // --- ROBUST INITIALIZATION ---
+        // --- NEW, MORE ROBUST INITIALIZATION ---
         function onGapiLoaded() {
             logStatus("Google API script loaded.");
-            gapi.load('client:auth2:picker', function() {
-                logStatus("Auth2 and Picker libraries loaded.");
-                gapi.client.init({
-                    apiKey: DEVELOPER_KEY,
-                    clientId: CLIENT_ID,
-                    scope: SCOPES,
-                    discoveryDocs: ["https://script.googleapis.com/$discovery/rest?version=v1"]
-                }).then(function () {
-                    logStatus("Google API client initialized successfully.");
-                    googleAuth = gapi.auth2.getAuthInstance();
-                    
-                    document.getElementById('auth-btn').disabled = false;
-                    logStatus("Sign-in button enabled.");
+            gapi.load('client:auth2', initAuth);
+        }
 
-                    googleAuth.isSignedIn.listen(updateSigninStatus);
-                    updateSigninStatus(googleAuth.isSignedIn.get());
-                }, function(error) {
-                    logStatus('Error initializing Google API client: ' + JSON.stringify(error, null, 2));
-                    console.error('Initialization Error:', error);
-                });
+        function initAuth() {
+            logStatus("Auth2 library loaded.");
+            gapi.client.init({
+                apiKey: DEVELOPER_KEY,
+                clientId: CLIENT_ID,
+                scope: SCOPES
+            }).then(function () {
+                logStatus("Authentication client initialized.");
+                googleAuth = gapi.auth2.getAuthInstance();
+                document.getElementById('auth-btn').disabled = false;
+                logStatus("Sign-in button enabled.");
+                googleAuth.isSignedIn.listen(updateSigninStatus);
+                updateSigninStatus(googleAuth.isSignedIn.get());
+            }, function(error) {
+                logStatus('FATAL: Error initializing auth client: ' + JSON.stringify(error, null, 2));
             });
         }
 
@@ -124,14 +122,27 @@
             if (isSignedIn) {
                 document.getElementById('auth-section').style.display = 'none';
                 document.getElementById('app-section').style.display = 'block';
-                document.getElementById('pick-file-btn').disabled = false;
-                const user = googleAuth.currentUser.get();
-                const profile = user.getBasicProfile();
-                document.getElementById('user-email').textContent = profile.getEmail();
+                // Load Picker and Script APIs only after successful sign-in
+                loadPickerAndScriptApi();
             } else {
                 document.getElementById('auth-section').style.display = 'block';
                 document.getElementById('app-section').style.display = 'none';
             }
+        }
+
+        function loadPickerAndScriptApi() {
+            logStatus("User signed in. Loading Picker and Script APIs...");
+            gapi.load('picker', {'callback': () => { 
+                logStatus("Picker API loaded.");
+                document.getElementById('pick-file-btn').disabled = false;
+            }});
+            gapi.client.load('https://script.googleapis.com/$discovery/rest?version=v1')
+                .then(function() {
+                    logStatus("Apps Script API loaded.");
+                })
+                .catch(function(err) {
+                    logStatus("Error loading Apps Script API: " + JSON.stringify(err));
+                });
         }
 
         function showPicker() {
@@ -179,17 +190,14 @@
                 'resource': request
             }).then(function(resp) {
                 if (resp.result && resp.result.error) {
-                    console.error('Script error:', resp.result.error);
                     logStatus(`SCRIPT ERROR: ${resp.result.error.message || 'Unknown error. Check Apps Script logs.'}`);
-                    setLoadingState(false);
                 } else {
                     const logs = resp.result.response.result;
                     logs.forEach(log => logStatus(log));
-                    setLoadingState(false);
                     alert("Modification complete!");
                 }
+                setLoadingState(false);
             }).catch(function(err) {
-                console.error('API call error:', err);
                 logStatus(`API CALL ERROR: ${err.result.error.message}`);
                 setLoadingState(false);
             });
