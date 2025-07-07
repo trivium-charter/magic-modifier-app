@@ -121,36 +121,45 @@
 
         // --- INITIALIZATION ---
         function gapiLoaded() {
+            console.log("gapiLoaded: GAPI script has loaded.");
             gapi.load('client:picker', initializePicker);
         }
 
         function gisLoaded() {
+            console.log("gisLoaded: GIS script has loaded.");
             tokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: CLIENT_ID,
                 scope: 'https://www.googleapis.com/auth/drive.readonly',
                 callback: (tokenResponse) => {
-                    accessToken = tokenResponse.access_token;
-                    showApp();
+                    console.log("Token Callback Fired:", tokenResponse);
+                    if (tokenResponse && tokenResponse.access_token) {
+                        console.log("Access Token received successfully.");
+                        accessToken = tokenResponse.access_token;
+                        showApp();
+                    } else {
+                        console.error("Token Callback Error: No access token received.", tokenResponse);
+                    }
                 },
             });
+            console.log("gisLoaded: Token client has been initialized.");
         }
 
         function initializePicker() {
+            console.log("initializePicker: Picker API has been initialized.");
             pickerApiLoaded = true;
         }
 
         // --- AUTHENTICATION ---
         function handleCredentialResponse(response) {
-            // This function is called after the user signs in with the Google button.
-            // We get a credential, but for API calls we need an access token.
-            // So we request an access token.
+            console.log("handleCredentialResponse: User has signed in. Response:", response);
+            console.log("Requesting access token for Drive scope...");
             tokenClient.requestAccessToken();
         }
 
         function showApp() {
+            console.log("showApp: Showing the main application view.");
             document.getElementById('auth-section').classList.add('hidden');
             document.getElementById('app-section').classList.remove('hidden');
-            // You can decode the JWT to get user info if needed, but for simplicity we just show the app
             document.getElementById('user-email').textContent = 'Signed in successfully.';
         }
 
@@ -160,19 +169,21 @@
             document.getElementById('auth-section').classList.remove('hidden');
             document.getElementById('app-section').classList.add('hidden');
             logStatus('User signed out.');
+            console.log("User has signed out.");
         }
 
         // --- GOOGLE PICKER ---
         function showPicker() {
             if (!pickerApiLoaded || !accessToken) {
                 logStatus("Error: Picker not loaded or user not signed in.");
+                console.error("showPicker Error: Picker not loaded or no access token.");
                 return;
             }
 
             const view = new google.picker.View(google.picker.ViewId.PRESENTATIONS);
             const picker = new google.picker.PickerBuilder()
                 .enableFeature(google.picker.Feature.NAV_HIDDEN)
-                .setAppId(CLIENT_ID.split('-')[0]) // Use the numeric part of the client ID as App ID
+                .setAppId(CLIENT_ID.split('-')[0])
                 .setOAuthToken(accessToken)
                 .addView(view)
                 .setDeveloperKey(DEVELOPER_KEY)
@@ -198,7 +209,7 @@
                 logStatus("Error: No file selected.");
                 return;
             }
-            if (SCRIPT_URL === "https://trivium-charter.github.io/magic-modifier-app/") {
+            if (SCRIPT_URL === "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE") {
                 logStatus("ERROR: Please configure the SCRIPT_URL in the HTML file.");
                 alert("Configuration Error: The Apps Script URL is not set. Please edit the HTML file.");
                 return;
@@ -214,11 +225,10 @@
                 targetLexile: targetLexile
             };
 
-            // We need to pass the user's auth token to the Apps Script
-            // so it can run with the user's permissions.
             const headers = new Headers({
                 "Content-Type": "application/json",
-                "Authorization": `Bearer ${gapi.client.getToken().access_token}`
+                // CORRECTED: Use the accessToken variable directly
+                "Authorization": `Bearer ${accessToken}` 
             });
 
             fetch(SCRIPT_URL, {
