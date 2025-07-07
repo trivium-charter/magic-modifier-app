@@ -5,9 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Curriculum Modification Tool</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- MODIFIED: The GSI script now calls the gisLoaded function when it's ready -->
-    <script src="https://accounts.google.com/gsi/client?onload=gisLoaded" async defer></script>
-    <script src="https://apis.google.com/js/api.js?onload=gapiLoaded" async defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
@@ -24,10 +21,11 @@
             <p class="text-gray-500 mt-2">Modify Google Slides presentations with AI.</p>
         </div>
 
-        <!-- MODIFIED: Replaced declarative sign-in divs with a single container -->
-        <div id="auth-section" class="flex justify-center flex-col items-center">
+        <div id="auth-section" class="text-center">
             <p class="text-gray-600 mb-4">Please sign in to access your Google Drive.</p>
-            <div id="signInDiv"></div>
+            <button id="auth-btn" onclick="handleAuthClick()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">
+                Sign in with Google
+            </button>
         </div>
 
         <div id="app-section" class="hidden space-y-6">
@@ -36,7 +34,7 @@
                     <p class="font-medium text-gray-700">Welcome!</p>
                     <p id="user-email" class="text-sm text-gray-500"></p>
                 </div>
-                <button onclick="signOut()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Sign Out</button>
+                <button onclick="handleSignoutClick()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Sign Out</button>
             </div>
 
             <div>
@@ -47,7 +45,7 @@
                         <p id="file-name" class="text-gray-700 font-medium">No file selected.</p>
                         <p id="file-id-display" class="text-xs text-gray-500"></p>
                     </div>
-                    <button id="pick-file-btn" onclick="showPicker()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>Select File</button>
+                    <button id="pick-file-btn" onclick="showPicker()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors" disabled>Select File</button>
                 </div>
             </div>
 
@@ -73,87 +71,60 @@
         </div>
     </div>
 
+    <script src="https://apis.google.com/js/api.js?onload=onGapiLoaded"></script>
     <script>
         // --- CONFIGURATION ---
         const DEVELOPER_KEY = "AIzaSyBj8MV52AmCUxIqmi-s3J1O1kLN3BVdr0s";
         const CLIENT_ID = "52389342801-mf261u1n5lu8rkbs2ug8k2jkfj0jgeqj.apps.googleusercontent.com";
         const SCRIPT_ID = "1S5dO5j7b8dY6kL3nF4gH5jK2l1mN0oPqRsTuVwXyZ-9aB8c7d6e5f4g3h2j1";
+        const SCOPES = 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/script.scriptapp';
         
-        // --- GLOBAL VARIABLES ---
-        let accessToken = null;
-        let gapiInited = false;
+        let googleAuth;
         let selectedFileId = null;
-        let tokenClient;
 
-        // --- INITIALIZATION ---
-        function gapiLoaded() {
-            gapi.load('client:picker', () => {
-                gapi.client.load('https://script.googleapis.com/$discovery/rest?version=v1', 'v1', () => {
-                    gapiInited = true;
-                    if (accessToken) {
-                        document.getElementById('pick-file-btn').disabled = false;
-                    }
-                });
+        function onGapiLoaded() {
+            gapi.load('client:auth2:picker', initClient);
+        }
+
+        function initClient() {
+            gapi.client.init({
+                apiKey: DEVELOPER_KEY,
+                clientId: CLIENT_ID,
+                scope: SCOPES,
+                discoveryDocs: ["https://script.googleapis.com/$discovery/rest?version=v1"]
+            }).then(function () {
+                googleAuth = gapi.auth2.getAuthInstance();
+                googleAuth.isSignedIn.listen(updateSigninStatus);
+                updateSigninStatus(googleAuth.isSignedIn.get());
+            }, function(error) {
+                logStatus('Error initializing Google API client: ' + JSON.stringify(error, null, 2));
             });
         }
 
-        // MODIFIED: This function is now called by the GSI script tag's onload parameter
-        function gisLoaded() {
-            google.accounts.id.initialize({
-                client_id: CLIENT_ID,
-                callback: handleCredentialResponse,
-                use_fedcm_for_prompt: false
-            });
-            google.accounts.id.renderButton(
-                document.getElementById('signInDiv'),
-                { theme: "outline", size: "large", text: "signin_with" }
-            );
+        function handleAuthClick() {
+            googleAuth.signIn();
         }
 
-        // --- AUTHENTICATION ---
-        function handleCredentialResponse(response) {
-            tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: CLIENT_ID,
-                scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/script.scriptapp',
-                callback: (tokenResponse) => {
-                    if (tokenResponse && tokenResponse.access_token) {
-                        accessToken = tokenResponse.access_token;
-                        gapi.client.setToken(tokenResponse);
-                        showApp();
-                    }
-                },
-            });
-            tokenClient.requestAccessToken();
+        function handleSignoutClick() {
+            googleAuth.signOut();
         }
 
-        function showApp() {
-            document.getElementById('auth-section').classList.add('hidden');
-            document.getElementById('app-section').classList.remove('hidden');
-            document.getElementById('user-email').textContent = 'Signed in successfully.';
-            if (gapiInited) {
+        function updateSigninStatus(isSignedIn) {
+            if (isSignedIn) {
+                document.getElementById('auth-section').style.display = 'none';
+                document.getElementById('app-section').style.display = 'block';
                 document.getElementById('pick-file-btn').disabled = false;
+                const user = googleAuth.currentUser.get();
+                const profile = user.getBasicProfile();
+                document.getElementById('user-email').textContent = profile.getEmail();
+            } else {
+                document.getElementById('auth-section').style.display = 'block';
+                document.getElementById('app-section').style.display = 'none';
             }
         }
 
-        function signOut() {
-            if(accessToken) {
-                google.accounts.oauth2.revoke(accessToken, () => {});
-                gapi.client.setToken(null);
-                accessToken = null;
-            }
-            document.getElementById('auth-section').classList.remove('hidden');
-            document.getElementById('app-section').classList.add('hidden');
-            document.getElementById('pick-file-btn').disabled = true;
-            document.getElementById('start-btn').disabled = true;
-            logStatus('User signed out.');
-        }
-
-        // --- GOOGLE PICKER ---
         function showPicker() {
-            if (!gapiInited || !accessToken) {
-                logStatus("Error: Picker API not ready or user not fully signed in.");
-                return;
-            }
+            const accessToken = googleAuth.currentUser.get().getAuthResponse().access_token;
             const view = new google.picker.View(google.picker.ViewId.PRESENTATIONS);
             const picker = new google.picker.PickerBuilder()
                 .enableFeature(google.picker.Feature.NAV_HIDDEN)
@@ -177,7 +148,6 @@
             }
         }
         
-        // --- CORE LOGIC using google.script.run ---
         function startModificationProcess() {
             if (!selectedFileId) {
                 logStatus("Error: No file selected.");
@@ -190,8 +160,7 @@
 
             const request = {
                 function: 'runModificationFromWebApp',
-                parameters: [selectedFileId, targetLexile],
-                devMode: false
+                parameters: [selectedFileId, targetLexile]
             };
             
             gapi.client.script.scripts.run({
@@ -215,7 +184,6 @@
             });
         }
 
-        // --- UI HELPERS ---
         function logStatus(message) {
             const log = document.getElementById('status-log');
             log.innerHTML += `<p>${new Date().toLocaleTimeString()}: ${message}</p>`;
@@ -229,11 +197,11 @@
             if (isLoading) {
                 btn.disabled = true;
                 btnText.textContent = "Processing...";
-                spinner.classList.remove('hidden');
+                spinner.style.display = 'block';
             } else {
                 btn.disabled = false;
                 btnText.textContent = "Start Modification";
-                spinner.classList.add('hidden');
+                spinner.style.display = 'none';
             }
         }
     </script>
