@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Curriculum Modification Tool</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!-- MODIFIED: The GSI script now calls the gisLoaded function when it's ready -->
+    <script src="https://accounts.google.com/gsi/client?onload=gisLoaded" async defer></script>
     <script src="https://apis.google.com/js/api.js?onload=gapiLoaded" async defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -23,15 +24,10 @@
             <p class="text-gray-500 mt-2">Modify Google Slides presentations with AI.</p>
         </div>
 
-        <div id="auth-section" class="text-center">
+        <!-- MODIFIED: Replaced declarative sign-in divs with a single container -->
+        <div id="auth-section" class="flex justify-center flex-col items-center">
             <p class="text-gray-600 mb-4">Please sign in to access your Google Drive.</p>
-            <div id="g_id_onload"
-                 data-client_id="52389342801-mf261u1n5lu8rkbs2ug8k2jkfj0jgeqj.apps.googleusercontent.com"
-                 data-callback="handleCredentialResponse"
-                 data-auto_select="false"
-                 data-use_fedcm_for_prompt="false">
-            </div>
-            <div class="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="outline" data-text="signin_with" data-size="large" data-logo_alignment="left"></div>
+            <div id="signInDiv"></div>
         </div>
 
         <div id="app-section" class="hidden space-y-6">
@@ -81,17 +77,18 @@
         // --- CONFIGURATION ---
         const DEVELOPER_KEY = "AIzaSyBj8MV52AmCUxIqmi-s3J1O1kLN3BVdr0s";
         const CLIENT_ID = "52389342801-mf261u1n5lu8rkbs2ug8k2jkfj0jgeqj.apps.googleusercontent.com";
-        const SCRIPT_ID = "1S5dO5j7b8dY6kL3nF4gH5jK2l1mN0oPqRsTuVwXyZ-9aB8c7d6e5f4g3h2j1"; // Example - Use your actual Script ID
+        const SCRIPT_ID = "1S5dO5j7b8dY6kL3nF4gH5jK2l1mN0oPqRsTuVwXyZ-9aB8c7d6e5f4g3h2j1";
         
         // --- GLOBAL VARIABLES ---
         let accessToken = null;
         let gapiInited = false;
         let selectedFileId = null;
+        let tokenClient;
 
         // --- INITIALIZATION ---
         function gapiLoaded() {
             gapi.load('client:picker', () => {
-                gapi.client.load('https://script.googleapis.com/v1/scripts', 'v1', () => {
+                gapi.client.load('https://script.googleapis.com/$discovery/rest?version=v1', 'v1', () => {
                     gapiInited = true;
                     if (accessToken) {
                         document.getElementById('pick-file-btn').disabled = false;
@@ -100,9 +97,22 @@
             });
         }
 
+        // MODIFIED: This function is now called by the GSI script tag's onload parameter
+        function gisLoaded() {
+            google.accounts.id.initialize({
+                client_id: CLIENT_ID,
+                callback: handleCredentialResponse,
+                use_fedcm_for_prompt: false
+            });
+            google.accounts.id.renderButton(
+                document.getElementById('signInDiv'),
+                { theme: "outline", size: "large", text: "signin_with" }
+            );
+        }
+
         // --- AUTHENTICATION ---
         function handleCredentialResponse(response) {
-            const tokenClient = google.accounts.oauth2.initTokenClient({
+            tokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: CLIENT_ID,
                 scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/script.scriptapp',
                 callback: (tokenResponse) => {
