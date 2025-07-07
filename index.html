@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Curriculum Modification Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://apis.google.com/js/api.js" async defer></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Simple spinner for loading states */
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border-left-color: #09f;
+            animation: spin 1s ease infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 flex items-center justify-center min-h-screen">
+
+    <div class="w-full max-w-2xl mx-auto bg-white rounded-xl shadow-lg p-8 space-y-6">
+        
+        <!-- Header -->
+        <div class="text-center">
+            <h1 class="text-3xl font-bold text-gray-800">Curriculum Modification Tool</h1>
+            <p class="text-gray-500 mt-2">Modify Google Slides presentations with AI.</p>
+        </div>
+
+        <!-- Authentication Section -->
+        <div id="auth-section" class="text-center">
+            <p class="text-gray-600 mb-4">Please sign in to access your Google Drive.</p>
+            <div id="g_id_onload"
+                 data-client_id="PASTE_YOUR_GOOGLE_CLOUD_CLIENT_ID_HERE"
+                 data-callback="handleCredentialResponse"
+                 data-auto_select="false">
+            </div>
+            <div class="g_id_signin"
+                 data-type="standard"
+                 data-shape="rectangular"
+                 data-theme="outline"
+                 data-text="signin_with"
+                 data-size="large"
+                 data-logo_alignment="left">
+            </div>
+        </div>
+
+        <!-- Main App Section (Hidden by default) -->
+        <div id="app-section" class="hidden space-y-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="font-medium text-gray-700">Welcome!</p>
+                    <p id="user-email" class="text-sm text-gray-500"></p>
+                </div>
+                <button onclick="signOut()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                    Sign Out
+                </button>
+            </div>
+
+            <!-- Step 1: Select File -->
+            <div>
+                <label class="text-lg font-semibold text-gray-700">Step 1: Choose a Presentation</label>
+                <div class="mt-2 flex items-center space-x-4 p-4 border-2 border-dashed rounded-lg">
+                    <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                    <div class="flex-grow">
+                        <p id="file-name" class="text-gray-700 font-medium">No file selected.</p>
+                        <p id="file-id-display" class="text-xs text-gray-500"></p>
+                    </div>
+                    <button id="pick-file-btn" onclick="showPicker()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                        Select File
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 2: Set Options -->
+            <div>
+                <label for="lexile-level" class="text-lg font-semibold text-gray-700">Step 2: Set Reading Level</label>
+                <input type="text" id="lexile-level" value="5th grade" class="mt-2 block w-full px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                <p class="text-xs text-gray-500 mt-1">e.g., "5th grade", "Lexile 800L", "beginner English learner"</p>
+            </div>
+            
+            <!-- Step 3: Run -->
+            <div class="text-center">
+                <button id="start-btn" onclick="startModificationProcess()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg transition-colors text-lg flex items-center justify-center disabled:bg-gray-400" disabled>
+                    <span id="start-btn-text">Start Modification</span>
+                    <div id="start-btn-spinner" class="spinner hidden ml-3"></div>
+                </button>
+            </div>
+
+            <!-- Status Log -->
+            <div>
+                <label class="text-lg font-semibold text-gray-700">Progress Log</label>
+                <div id="status-log" class="mt-2 w-full h-48 bg-gray-900 text-white font-mono text-sm p-4 rounded-lg overflow-y-auto">
+                    <p class="text-gray-400">Waiting to start...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const SCRIPT_URL = "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
+        const DEVELOPER_KEY = "PASTE_YOUR_GOOGLE_CLOUD_API_KEY_HERE"; // The same API key used in the script
+        const CLIENT_ID = "PASTE_YOUR_GOOGLE_CLOUD_CLIENT_ID_HERE";
+        
+        // --- GLOBAL VARIABLES ---
+        let tokenClient;
+        let accessToken = null;
+        let pickerApiLoaded = false;
+        let selectedFileId = null;
+
+        // --- INITIALIZATION ---
+        function gapiLoaded() {
+            gapi.load('client:picker', initializePicker);
+        }
+
+        function gisLoaded() {
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: 'https://www.googleapis.com/auth/drive.readonly',
+                callback: (tokenResponse) => {
+                    accessToken = tokenResponse.access_token;
+                    showApp();
+                },
+            });
+        }
+
+        function initializePicker() {
+            pickerApiLoaded = true;
+        }
+
+        // --- AUTHENTICATION ---
+        function handleCredentialResponse(response) {
+            // This function is called after the user signs in with the Google button.
+            // We get a credential, but for API calls we need an access token.
+            // So we request an access token.
+            tokenClient.requestAccessToken();
+        }
+
+        function showApp() {
+            document.getElementById('auth-section').classList.add('hidden');
+            document.getElementById('app-section').classList.remove('hidden');
+            // You can decode the JWT to get user info if needed, but for simplicity we just show the app
+            document.getElementById('user-email').textContent = 'Signed in successfully.';
+        }
+
+        function signOut() {
+            google.accounts.id.disableAutoSelect();
+            accessToken = null;
+            document.getElementById('auth-section').classList.remove('hidden');
+            document.getElementById('app-section').classList.add('hidden');
+            logStatus('User signed out.');
+        }
+
+        // --- GOOGLE PICKER ---
+        function showPicker() {
+            if (!pickerApiLoaded || !accessToken) {
+                logStatus("Error: Picker not loaded or user not signed in.");
+                return;
+            }
+
+            const view = new google.picker.View(google.picker.ViewId.PRESENTATIONS);
+            const picker = new google.picker.PickerBuilder()
+                .enableFeature(google.picker.Feature.NAV_HIDDEN)
+                .setAppId(CLIENT_ID.split('-')[0]) // Use the numeric part of the client ID as App ID
+                .setOAuthToken(accessToken)
+                .addView(view)
+                .setDeveloperKey(DEVELOPER_KEY)
+                .setCallback(pickerCallback)
+                .build();
+            picker.setVisible(true);
+        }
+
+        function pickerCallback(data) {
+            if (data[google.picker.Response.ACTION] == google.picker.Action.PICKED) {
+                const doc = data[google.picker.Response.DOCUMENTS][0];
+                selectedFileId = doc[google.picker.Document.ID];
+                document.getElementById('file-name').textContent = doc[google.picker.Document.NAME];
+                document.getElementById('file-id-display').textContent = `ID: ${selectedFileId}`;
+                document.getElementById('start-btn').disabled = false;
+                logStatus(`Selected file: ${doc[google.picker.Document.NAME]}`);
+            }
+        }
+        
+        // --- CORE LOGIC ---
+        function startModificationProcess() {
+            if (!selectedFileId) {
+                logStatus("Error: No file selected.");
+                return;
+            }
+            if (SCRIPT_URL === "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE") {
+                logStatus("ERROR: Please configure the SCRIPT_URL in the HTML file.");
+                alert("Configuration Error: The Apps Script URL is not set. Please edit the HTML file.");
+                return;
+            }
+
+            const targetLexile = document.getElementById('lexile-level').value;
+            setLoadingState(true);
+            logStatus("Starting modification process...");
+            logStatus(`Target reading level: ${targetLexile}`);
+
+            const payload = {
+                presentationId: selectedFileId,
+                targetLexile: targetLexile
+            };
+
+            // We need to pass the user's auth token to the Apps Script
+            // so it can run with the user's permissions.
+            const headers = new Headers({
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${gapi.client.getToken().access_token}`
+            });
+
+            fetch(SCRIPT_URL, {
+                method: "POST",
+                headers: headers,
+                body: JSON.stringify(payload),
+                redirect: "follow"
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Network response was not ok: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                logStatus("--- SCRIPT EXECUTION LOG ---");
+                if (data.logs) {
+                    data.logs.forEach(log => logStatus(log));
+                }
+                logStatus("--- PROCESS COMPLETE ---");
+                if (data.error) {
+                    logStatus(`ERROR: ${data.error}`);
+                } else {
+                    logStatus(`SUCCESS: ${data.result}`);
+                    alert(`Modification complete! Check the original file's folder for the new "(M)" version.`);
+                }
+                setLoadingState(false);
+            })
+            .catch(error => {
+                logStatus(`Fetch Error: ${error.message}`);
+                alert(`An error occurred: ${error.message}. Check the console for more details.`);
+                setLoadingState(false);
+            });
+        }
+
+        // --- UI HELPERS ---
+        function logStatus(message) {
+            const log = document.getElementById('status-log');
+            log.innerHTML += `<p>${new Date().toLocaleTimeString()}: ${message}</p>`;
+            log.scrollTop = log.scrollHeight; // Auto-scroll to bottom
+        }
+
+        function setLoadingState(isLoading) {
+            const btn = document.getElementById('start-btn');
+            const btnText = document.getElementById('start-btn-text');
+            const spinner = document.getElementById('start-btn-spinner');
+
+            if (isLoading) {
+                btn.disabled = true;
+                btnText.textContent = "Processing...";
+                spinner.classList.remove('hidden');
+            } else {
+                btn.disabled = false;
+                btnText.textContent = "Start Modification";
+                spinner.classList.add('hidden');
+            }
+        }
+
+    </script>
+</body>
+</html>
